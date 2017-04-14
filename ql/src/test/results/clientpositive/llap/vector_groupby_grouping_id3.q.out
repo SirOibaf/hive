@@ -126,8 +126,17 @@ STAGE PLANS:
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
-                notVectorizedReason: Key expression for GROUPBY operator: Non-column key expressions not supported for MERGEPARTIAL
-                vectorized: false
+                reduceColumnNullOrder: aaa
+                reduceColumnSortOrder: +++
+                groupByVectorOutput: true
+                allNative: false
+                usesVectorUDFAdaptor: false
+                vectorized: true
+                rowBatchContext:
+                    dataColumnCount: 4
+                    dataColumns: KEY._col0:int, KEY._col1:int, KEY._col2:int, VALUE._col0:bigint
+                    partitionColumnCount: 0
+                    scratchColumnTypeNames: bigint
             Reduce Operator Tree:
               Group By Operator
                 aggregations: count(VALUE._col0)
@@ -266,6 +275,8 @@ STAGE PLANS:
             Reduce Vectorization:
                 enabled: true
                 enableConditionsMet: hive.vectorized.execution.reduce.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true
+                reduceColumnNullOrder: aaa
+                reduceColumnSortOrder: +++
                 groupByVectorOutput: true
                 allNative: false
                 usesVectorUDFAdaptor: false

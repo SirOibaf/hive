@@ -276,6 +276,22 @@ public class ReduceWork extends BaseWork {
     return vectorReduceEngine;
   }
 
+  public void setVectorReduceColumnSortOrder(String vectorReduceColumnSortOrder) {
+    this.vectorReduceColumnSortOrder = vectorReduceColumnSortOrder;
+  }
+
+  public String getVectorReduceColumnSortOrder() {
+    return vectorReduceColumnSortOrder;
+  }
+
+  public void setVectorReduceColumnNullOrder(String vectorReduceColumnNullOrder) {
+    this.vectorReduceColumnNullOrder = vectorReduceColumnNullOrder;
+  }
+
+  public String getVectorReduceColumnNullOrder() {
+    return vectorReduceColumnNullOrder;
+  }
+
   // Use LinkedHashSet to give predictable display order.
   private static Set<String> reduceVectorizableEngines =
       new LinkedHashSet<String>(Arrays.asList("tez", "spark"));
@@ -326,6 +342,22 @@ public class ReduceWork extends BaseWork {
         reduceVectorizationConditions = createReduceExplainVectorizationConditions();
       }
       return VectorizationCondition.getConditionsNotMet(reduceVectorizationConditions);
+    }
+
+    @Explain(vectorization = Vectorization.DETAIL, displayName = "reduceColumnSortOrder", explainLevels = { Level.DEFAULT, Level.EXTENDED })
+    public String getReduceColumnSortOrder() {
+      if (!getVectorizationExamined()) {
+        return null;
+      }
+      return reduceWork.getVectorReduceColumnSortOrder();
+    }
+
+    @Explain(vectorization = Vectorization.DETAIL, displayName = "reduceColumnNullOrder", explainLevels = { Level.DEFAULT, Level.EXTENDED })
+    public String getReduceColumnNullOrder() {
+      if (!getVectorizationExamined()) {
+        return null;
+      }
+      return reduceWork.getVectorReduceColumnNullOrder();
     }
   }
 
