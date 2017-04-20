@@ -53,7 +53,6 @@ import org.antlr.runtime.tree.TreeWizard;
 import org.antlr.runtime.tree.TreeWizard.ContextVisitor;
 import org.apache.calcite.rel.RelNode;
 import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.mutable.MutableBoolean;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -925,8 +924,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       fs = tablePath.getFileSystem(conf);
       fs.mkdirs(tablePath);
       Path dataFile = new Path(tablePath, "data_file");
-
-      LOG.error(org.apache.hadoop.fs.FileSystem.class.getProtectionDomain().getCodeSource().getLocation().toString());
       out = fs.create(dataFile);
       List<FieldSchema> fields = new ArrayList<FieldSchema>();
 
@@ -2574,6 +2571,7 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       }
       unparseTranslator.addIdentifierTranslation(condn);
       break;
+    case HiveParser.TOK_NULL:
     case HiveParser.Number:
     case HiveParser.StringLiteral:
     case HiveParser.IntegralLiteral:
@@ -3064,8 +3062,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
   protected static ASTNode rewriteGroupingFunctionAST(final List<ASTNode> grpByAstExprs, ASTNode targetNode,
           final boolean noneSet) throws SemanticException {
-    final MutableBoolean visited = new MutableBoolean(false);
-    final MutableBoolean found = new MutableBoolean(false);
 
     TreeVisitorAction action = new TreeVisitorAction() {
 
@@ -3077,45 +3073,62 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       @Override
       public Object post(Object t) {
         ASTNode root = (ASTNode) t;
-        if (root.getType() == HiveParser.TOK_FUNCTION && root.getChildCount() == 2) {
+        if (root.getType() == HiveParser.TOK_FUNCTION) {
           ASTNode func = (ASTNode) ParseDriver.adaptor.getChild(root, 0);
-          if (func.getText().equals("grouping")) {
-            ASTNode c = (ASTNode) ParseDriver.adaptor.getChild(root, 1);
-            visited.setValue(true);
-            for (int i = 0; i < grpByAstExprs.size(); i++) {
-              ASTNode grpByExpr = grpByAstExprs.get(i);
-              if (grpByExpr.toStringTree().equals(c.toStringTree())) {
-                ASTNode child1;
-                if (noneSet) {
-                  // Query does not contain CUBE, ROLLUP, or GROUPING SETS, and thus,
-                  // grouping should return 0
-                  child1 = (ASTNode) ParseDriver.adaptor.create(HiveParser.IntegralLiteral,
-                        String.valueOf(0));
-                } else {
-                  // We refer to grouping_id column
-                  child1 = (ASTNode) ParseDriver.adaptor.create(
-                          HiveParser.TOK_TABLE_OR_COL, "TOK_TABLE_OR_COL");
-                  ParseDriver.adaptor.addChild(child1, ParseDriver.adaptor.create(
-                          HiveParser.Identifier, VirtualColumn.GROUPINGID.getName()));
+          if (func.getText().equals("grouping") && func.getChildCount() == 0) {
+            int numberOperands = ParseDriver.adaptor.getChildCount(root);
+            // We implement this logic using replaceChildren instead of replacing
+            // the root node itself because windowing logic stores multiple
+            // pointers to the AST, and replacing root might lead to some pointers
+            // leading to non-rewritten version
+            ASTNode newRoot = new ASTNode();
+            // Rewritten grouping function
+            ASTNode groupingFunc = (ASTNode) ParseDriver.adaptor.create(
+                    HiveParser.Identifier, "grouping");
+            ParseDriver.adaptor.addChild(groupingFunc, ParseDriver.adaptor.create(
+                    HiveParser.Identifier, "rewritten"));
+            newRoot.addChild(groupingFunc);
+            // Grouping ID reference
+            ASTNode childGroupingID;
+            if (noneSet) {
+              // Query does not contain CUBE, ROLLUP, or GROUPING SETS, and thus,
+              // grouping should return 0
+              childGroupingID = (ASTNode) ParseDriver.adaptor.create(HiveParser.IntegralLiteral,
+                    String.valueOf(0));
+            } else {
+              // We refer to grouping_id column
+              childGroupingID = (ASTNode) ParseDriver.adaptor.create(
+                      HiveParser.TOK_TABLE_OR_COL, "TOK_TABLE_OR_COL");
+              ParseDriver.adaptor.addChild(childGroupingID, ParseDriver.adaptor.create(
+                      HiveParser.Identifier, VirtualColumn.GROUPINGID.getName()));
+            }
+            newRoot.addChild(childGroupingID);
+            // Indices
+            for (int i = 1; i < numberOperands; i++) {
+              ASTNode c = (ASTNode) ParseDriver.adaptor.getChild(root, i);
+              for (int j = 0; j < grpByAstExprs.size(); j++) {
+                ASTNode grpByExpr = grpByAstExprs.get(j);
+                if (grpByExpr.toStringTree().equals(c.toStringTree())) {
+                  // Create and add AST node with position of grouping function input
+                  // in group by clause
+                  ASTNode childN = (ASTNode) ParseDriver.adaptor.create(HiveParser.IntegralLiteral,
+                          String.valueOf(IntMath.mod(-j-1, grpByAstExprs.size())));
+                  newRoot.addChild(childN);
+                  break;
                 }
-                ASTNode child2 = (ASTNode) ParseDriver.adaptor.create(HiveParser.IntegralLiteral,
-                        String.valueOf(IntMath.mod(-i-1, grpByAstExprs.size())));
-                root.setChild(1, child1);
-                root.addChild(child2);
-                found.setValue(true);
-                break;
               }
             }
+            if (numberOperands + 1 != ParseDriver.adaptor.getChildCount(newRoot)) {
+              throw new RuntimeException(ErrorMsg.HIVE_GROUPING_FUNCTION_EXPR_NOT_IN_GROUPBY.getMsg());
+            }
+            // Replace expression
+            root.replaceChildren(0, numberOperands - 1, newRoot);
           }
         }
         return t;
       }
     };
-    ASTNode newTargetNode = (ASTNode) new TreeVisitor(ParseDriver.adaptor).visit(targetNode, action);
-    if (visited.booleanValue() && !found.booleanValue()) {
-      throw new SemanticException(ErrorMsg.HIVE_GROUPING_FUNCTION_EXPR_NOT_IN_GROUPBY.getMsg());
-    }
-    return newTargetNode;
+    return (ASTNode) new TreeVisitor(ParseDriver.adaptor).visit(targetNode, action);
   }
 
   private Operator genPlanForSubQueryPredicate(
@@ -8109,7 +8122,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
 
     JoinDesc desc = new JoinDesc(exprMap, outputColumnNames,
         join.getNoOuterJoin(), joinCondns, filterMap, joinKeys);
-    desc.setSemiJoinHints(join.getSemiJoinHint());
     desc.setReversedExprs(reversedExprs);
     desc.setFilterMap(join.getFilterMap());
     // For outer joins, add filters that apply to more than one input
@@ -8657,10 +8669,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       parseStreamTables(joinTree, qb);
     }
 
-    if (qb.getParseInfo().getHints() != null) {
-      // TODO: do we need this for unique join?
-      joinTree.setSemiJoinHint(parseSemiJoinHint(qb.getParseInfo().getHints()));
-    }
     return joinTree;
   }
 
@@ -8959,8 +8967,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
       if ((conf.getVar(HiveConf.ConfVars.HIVE_EXECUTION_ENGINE).equals("tez")) == false) {
         parseStreamTables(joinTree, qb);
       }
-
-      joinTree.setSemiJoinHint(parseSemiJoinHint(qb.getParseInfo().getHints()));
     }
 
     return joinTree;
@@ -9006,62 +9012,6 @@ public class SemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     joinTree.setStreamAliases(streamAliases);
-  }
-
-  /** Parses semjoin hints in the query and returns the table names mapped to filter size, or -1 if not specified.
-   *  Hints can be in 3 formats
-   *  1. TableName, ColumnName, bloom filter entries
-   *  2. TableName, bloom filter entries, and
-   *  3. TableName, ColumnName
-   *  */
-  public Map<String, SemiJoinHint> parseSemiJoinHint(ASTNode hints) throws SemanticException {
-    if (hints == null) return null;
-    Map<String, SemiJoinHint> result = null;
-    for (Node hintNode : hints.getChildren()) {
-      ASTNode hint = (ASTNode) hintNode;
-      if (hint.getChild(0).getType() != HintParser.TOK_LEFTSEMIJOIN) continue;
-      if (result == null) {
-        result = new HashMap<>();
-      }
-      String alias = null;
-      String colName = null;
-      Tree args = hint.getChild(1);
-      for (int i = 0; i < args.getChildCount(); i++) {
-        // We can have table names, column names or sizes here (or incorrect hint if the user is so inclined).
-        String text = args.getChild(i).getText();
-        Integer number = null;
-        try {
-          number = Integer.parseInt(text);
-        } catch (NumberFormatException ex) { // Ignore.
-        }
-        if (number != null) {
-          if (alias == null) {
-            throw new SemanticException("Invalid semijoin hint - arg " + i + " ("
-                + text + ") is a number but the previous one is not an alias");
-          }
-          SemiJoinHint sjHint = new SemiJoinHint(alias, colName, number);
-          result.put(alias, sjHint);
-          alias = null;
-          colName = null;
-        } else {
-          if (alias == null) {
-            alias = text;
-          } else if (colName == null ){
-            colName = text;
-          } else {
-            // No bloom filter entries provided.
-            SemiJoinHint sjHint = new SemiJoinHint(alias, colName, null);
-            result.put(alias, sjHint);
-            alias = text;
-            colName = null;
-          }
-        }
-      }
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Semijoin hint parsed: " + result);
-    }
-    return result;
   }
 
   /**
