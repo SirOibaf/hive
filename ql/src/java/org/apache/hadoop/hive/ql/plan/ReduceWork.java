@@ -85,6 +85,8 @@ public class ReduceWork extends BaseWork {
 
   // boolean that says whether tez auto reduce parallelism should be used
   private boolean isAutoReduceParallelism;
+  // boolean that says whether the data distribution is uniform hash (not java HashCode)
+  private transient boolean isUniformDistribution = false;
 
   // boolean that says whether to slow start or not
   private boolean isSlowStart = true;
@@ -100,6 +102,11 @@ public class ReduceWork extends BaseWork {
 
   private boolean reduceVectorizationEnabled;
   private String vectorReduceEngine;
+
+  private String vectorReduceColumnSortOrder;
+  private String vectorReduceColumnNullOrder;
+
+  private transient TezEdgeProperty edgeProp;
 
   /**
    * If the plan has a reducer and correspondingly a reduce-sink, then store the TableDesc pointing
@@ -228,6 +235,15 @@ public class ReduceWork extends BaseWork {
     this.isSlowStart = isSlowStart;
   }
 
+  // ReducerTraits.UNIFORM
+  public void setUniformDistribution(boolean isUniformDistribution) {
+    this.isUniformDistribution = isUniformDistribution;
+  }
+
+  public boolean isUniformDistribution() {
+    return this.isUniformDistribution;
+  }
+
   public void setMinReduceTasks(int minReduceTasks) {
     this.minReduceTasks = minReduceTasks;
   }
@@ -319,5 +335,13 @@ public class ReduceWork extends BaseWork {
       return null;
     }
     return new ReduceExplainVectorization(this);
+  }
+
+  public void setEdgePropRef(TezEdgeProperty edgeProp) {
+    this.edgeProp = edgeProp;
+  }
+
+  public TezEdgeProperty getEdgePropRef() {
+    return edgeProp;
   }
 }
