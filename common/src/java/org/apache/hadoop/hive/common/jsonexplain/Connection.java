@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hive.common.jsonexplain.tez;
+package org.apache.hadoop.hive.common.jsonexplain;
 
 public final class Connection {
   public final String type;
