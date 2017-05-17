@@ -90,7 +90,7 @@
       <artifactId>hive-webhcat-java-client</artifactId>
       <version>${project.version}</version>
     </dependency>
-    <dependency
+    <dependency>
       <groupId>io.hops.hive</groupId>
       <artifactId>hive-it-util</artifactId>
       <version>${project.version}</version>
