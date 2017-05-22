@@ -110,6 +110,7 @@ import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObje
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject.HivePrivObjectActionType;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HivePrivilegeObject.HivePrivilegeObjectType;
 import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthzContext;
+import org.apache.hadoop.hive.ql.session.OperationLog;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
 import org.apache.hadoop.hive.serde2.ByteStream;
@@ -1369,7 +1370,7 @@ public class Driver implements CommandProcessor {
 
     OperationLog ol = OperationLog.getCurrentOperationLog();
     if (ol != null) {
-      ol.writeOperationLog(LoggingLevel.EXECUTION, "Waiting to acquire compile lock.\n");
+      ol.writeOperationLog(OperationLog.LoggingLevel.EXECUTION, "Waiting to acquire compile lock.\n");
     }
 
     if (maxCompileLockWaitTime > 0) {
@@ -1392,7 +1393,7 @@ public class Driver implements CommandProcessor {
 
     LOG.debug(lockAcquiredMsg);
     if (ol != null) {
-        ol.writeOperationLog(LoggingLevel.EXECUTION, lockAcquiredMsg + "\n");
+        ol.writeOperationLog(OperationLog.LoggingLevel.EXECUTION, lockAcquiredMsg + "\n");
     }
     return compileLock;
   }
@@ -2044,7 +2045,7 @@ public class Driver implements CommandProcessor {
     // Propagate warning to beeline via operation log.
     OperationLog ol = OperationLog.getCurrentOperationLog();
     if (ol != null) {
-      ol.writeOperationLog(LoggingLevel.EXECUTION, warning + "\n");
+      ol.writeOperationLog(OperationLog.LoggingLevel.EXECUTION, warning + "\n");
     }
   }
 
