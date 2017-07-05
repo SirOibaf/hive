@@ -30,6 +30,7 @@ import java.security.AccessControlException;
 import java.security.PrivilegedExceptionAction;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -49,13 +50,10 @@ import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.conf.HiveConfUtil;
-import org.apache.hadoop.hive.io.HdfsUtils;
 import org.apache.hadoop.hive.shims.HadoopShims;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hive.common.util.ShutdownHookManager;
 import org.slf4j.Logger;
@@ -564,7 +562,7 @@ public final class FileUtils {
                 HiveConf.ConfVars.HIVE_EXEC_COPYFILE_MAXNUMFILES) + ")");
         LOG.info("Launch distributed copy (distcp) job.");
         triedDistcp = true;
-        copied = distCp(srcFS, src, dst, deleteSource, null, conf, shims);
+        copied = distCp(srcFS, Collections.singletonList(src), dst, deleteSource, null, conf, shims);
       }
     }
     if (!triedDistcp) {
@@ -577,17 +575,19 @@ public final class FileUtils {
     return copied;
   }
 
-  static boolean distCp(FileSystem srcFS, Path src, Path dst,
+  public static boolean distCp(FileSystem srcFS, List<Path> srcPaths, Path dst,
       boolean deleteSource, String doAsUser,
       HiveConf conf, HadoopShims shims) throws IOException {
     boolean copied = false;
     if (doAsUser == null){
-      copied = shims.runDistCp(src, dst, conf);
+      copied = shims.runDistCp(srcPaths, dst, conf);
     } else {
-      copied = shims.runDistCpAs(src, dst, conf, doAsUser);
+      copied = shims.runDistCpAs(srcPaths, dst, conf, doAsUser);
     }
     if (copied && deleteSource) {
-      srcFS.delete(src, true);
+      for (Path path : srcPaths) {
+        srcFS.delete(path, true);
+      }
     }
     return copied;
   }

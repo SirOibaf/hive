@@ -134,7 +134,6 @@ public class ReplCopyTask extends Task<ReplCopyWork> implements Serializable {
       new CopyUtils(rwork.distCpDoAsUser(), conf).copyAndVerify(toPath, srcFiles);
 
       return 0;
-
     } catch (Exception e) {
       console.printError("Failed with exception " + e.getMessage(), "\n"
           + StringUtils.stringifyException(e));
