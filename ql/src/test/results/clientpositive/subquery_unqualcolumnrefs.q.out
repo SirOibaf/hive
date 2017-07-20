@@ -340,7 +340,7 @@ STAGE PLANS:
                         arguments: _col5
                         name: rank
                         window function: GenericUDAFRankEvaluator
-                        window frame: PRECEDING(MAX)~FOLLOWING(MAX)
+                        window frame: ROWS PRECEDING(MAX)~FOLLOWING(MAX)
                         isPivotResult: true
             Statistics: Num rows: 13 Data size: 1573 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
@@ -506,7 +506,7 @@ STAGE PLANS:
                         arguments: _col5
                         name: rank
                         window function: GenericUDAFRankEvaluator
-                        window frame: PRECEDING(MAX)~FOLLOWING(MAX)
+                        window frame: ROWS PRECEDING(MAX)~FOLLOWING(MAX)
                         isPivotResult: true
             Statistics: Num rows: 13 Data size: 1573 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
