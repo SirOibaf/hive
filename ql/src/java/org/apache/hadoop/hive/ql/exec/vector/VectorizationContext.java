@@ -125,6 +125,7 @@ import org.apache.hadoop.hive.ql.exec.vector.udf.VectorUDFAdaptor;
 import org.apache.hadoop.hive.ql.exec.vector.udf.VectorUDFArgDesc;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.optimizer.physical.Vectorizer;
+import org.apache.hadoop.hive.ql.metadata.VirtualColumn;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
@@ -225,6 +226,7 @@ public class VectorizationContext {
       projectedColumns.add(i);
       projectionColumnMap.put(projectionColumnNames.get(i), i);
     }
+
     int firstOutputColumnIndex = projectedColumns.size();
     this.ocm = new OutputColumnManager(firstOutputColumnIndex);
     this.firstOutputColumnIndex = firstOutputColumnIndex;
