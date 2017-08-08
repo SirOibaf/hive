@@ -56,7 +56,7 @@ class WarehouseInstance implements Closeable {
   final String functionsRoot;
   private Logger logger;
   private Driver driver;
-  private HiveConf hiveConf;
+  HiveConf hiveConf;
   MiniDFSCluster miniDFSCluster;
   private HiveMetaStoreClient client;
 
@@ -71,12 +71,19 @@ class WarehouseInstance implements Closeable {
     assert miniDFSCluster.isDataNodeUp();
     DistributedFileSystem fs = miniDFSCluster.getFileSystem();
 
+    Path warehouseRoot = mkDir(fs, "/warehouse" + uniqueIdentifier);
     Path cmRootPath = mkDir(fs, "/cmroot" + uniqueIdentifier);
     this.functionsRoot = mkDir(fs, "/functions" + uniqueIdentifier).toString();
-    initialize(cmRootPath.toString());
+
+    initialize(cmRootPath.toString(), warehouseRoot.toString(), hiveInTests);
   }
 
-  private void initialize(String cmRoot) throws Exception {
+  WarehouseInstance(Logger logger, MiniDFSCluster cluster) throws Exception {
+    this(logger, cluster, true);
+  }
+
+  private void initialize(String cmRoot, String warehouseRoot, boolean hiveInTest)
+      throws Exception {
     hiveConf = new HiveConf(miniDFSCluster.getConfiguration(0), TestReplicationScenarios.class);
     String metaStoreUri = System.getProperty("test." + HiveConf.ConfVars.METASTOREURIS.varname);
     String hiveWarehouseLocation = System.getProperty("test.warehouse.dir", "/tmp")
@@ -90,6 +97,7 @@ class WarehouseInstance implements Closeable {
     }
 
     // turn on db notification listener on meta store
+    hiveConf.setVar(HiveConf.ConfVars.METASTOREWAREHOUSE, warehouseRoot);
     hiveConf.setVar(HiveConf.ConfVars.METASTORE_TRANSACTIONAL_EVENT_LISTENERS, LISTENER_CLASS);
     hiveConf.setBoolVar(HiveConf.ConfVars.REPLCMENABLED, true);
     hiveConf.setBoolVar(HiveConf.ConfVars.FIRE_EVENTS_FOR_DML, true);
@@ -176,7 +184,7 @@ class WarehouseInstance implements Closeable {
     return this;
   }
 
-  WarehouseInstance verify(String data) throws IOException {
+  WarehouseInstance verifyResult (String data) throws IOException {
     verifyResults(data == null ? new String[] {} : new String[] { data });
     return this;
   }
@@ -188,7 +196,7 @@ class WarehouseInstance implements Closeable {
    * Unless for Null Values it actually returns in UpperCase and hence explicitly lowering case
    * before assert.
    */
-  private void verifyResults(String[] data) throws IOException {
+  WarehouseInstance verifyResults(String[] data) throws IOException {
     List<String> results = getOutput();
     logger.info("Expecting {}", StringUtils.join(data, ","));
     logger.info("Got {}", results);
@@ -196,6 +204,7 @@ class WarehouseInstance implements Closeable {
     for (int i = 0; i < data.length; i++) {
       assertEquals(data[i].toLowerCase(), results.get(i).toLowerCase());
     }
+    return this;
   }
 
   List<String> getOutput() throws IOException {
