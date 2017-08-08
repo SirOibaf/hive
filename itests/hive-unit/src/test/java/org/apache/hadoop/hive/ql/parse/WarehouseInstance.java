@@ -74,7 +74,10 @@ class WarehouseInstance implements Closeable {
     Path warehouseRoot = mkDir(fs, "/warehouse" + uniqueIdentifier);
     Path cmRootPath = mkDir(fs, "/cmroot" + uniqueIdentifier);
     this.functionsRoot = mkDir(fs, "/functions" + uniqueIdentifier).toString();
+<<<<<<< HEAD
 
+=======
+>>>>>>> 92f764e056... HIVE-16896: move replication load related work in semantic analysis phase to execution phase using a task (Anishek Agarwal, reviewed by Sankar Hariappan, Daniel Dai)
     initialize(cmRootPath.toString(), warehouseRoot.toString(), hiveInTests);
   }
 
