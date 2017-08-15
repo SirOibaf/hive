@@ -27,30 +27,36 @@ import org.apache.hadoop.hive.ql.parse.EximUtil;
 import org.apache.hadoop.hive.ql.parse.LoadSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.ReplicationSpec;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.parse.repl.CopyUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.login.LoginException;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.util.ArrayList;
+import java.util.List;
 
 public class FileOperations {
   private static Logger logger = LoggerFactory.getLogger(FileOperations.class);
   private final Path dataFileListPath;
   private final Path exportRootDataDir;
+  private final String distCpDoAsUser;
   private HiveConf hiveConf;
   private final FileSystem dataFileSystem, exportFileSystem;
 
-  public FileOperations(Path dataFileListPath, Path exportRootDataDir, HiveConf hiveConf)
-      throws IOException {
+  public FileOperations(Path dataFileListPath, Path exportRootDataDir,
+                        String distCpDoAsUser, HiveConf hiveConf) throws IOException {
     this.dataFileListPath = dataFileListPath;
     this.exportRootDataDir = exportRootDataDir;
+    this.distCpDoAsUser = distCpDoAsUser;
     this.hiveConf = hiveConf;
     dataFileSystem = dataFileListPath.getFileSystem(hiveConf);
     exportFileSystem = exportRootDataDir.getFileSystem(hiveConf);
   }
 
-  public void export(ReplicationSpec forReplicationSpec) throws IOException, SemanticException {
+  public void export(ReplicationSpec forReplicationSpec) throws Exception {
     if (forReplicationSpec.isLazy()) {
       exportFilesAsList();
     } else {
@@ -61,13 +67,14 @@ public class FileOperations {
   /**
    * This writes the actual data in the exportRootDataDir from the source.
    */
-  private void copyFiles() throws IOException {
+  private void copyFiles() throws IOException, LoginException {
     FileStatus[] fileStatuses =
         LoadSemanticAnalyzer.matchFilesOrDir(dataFileSystem, dataFileListPath);
+    List<Path> srcPaths = new ArrayList<>();
     for (FileStatus fileStatus : fileStatuses) {
-      ReplCopyTask.doCopy(exportRootDataDir, exportFileSystem, fileStatus.getPath(), dataFileSystem,
-          hiveConf);
+      srcPaths.add(fileStatus.getPath());
     }
+    new CopyUtils(distCpDoAsUser, hiveConf).doCopy(exportRootDataDir, srcPaths);
   }
 
   /**
