@@ -109,7 +109,7 @@ public class ReplChangeManager {
       if (fs.isDirectory(path)) {
         throw new IllegalArgumentException(path + " cannot be a directory");
       }
-      Path cmPath = getCMPath(hiveConf, checksumFor(path, fs));
+      Path cmPath = getCMPath(hiveConf, path.getName(), checksumFor(path, fs));
       boolean copySuccessful = FileUtils
           .copy(path.getFileSystem(hiveConf), path, cmPath.getFileSystem(hiveConf), cmPath, false,
               false, hiveConf);
@@ -151,11 +151,8 @@ public class ReplChangeManager {
           count += recycle(file.getPath(), ifPurge);
         }
       } else {
-        Path cmPath = getCMPath(hiveConf, checksumFor(path, fs));
-
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Moving " + path.toString() + " to " + cmPath.toString());
-        }
+        String fileCheckSum = checksumFor(path, fs);
+        Path cmPath = getCMPath(hiveConf, path.getName(), fileCheckSum);
 
         // set timestamp before moving to cmroot, so we can
         // avoid race condition CM remove the file before setting
@@ -228,11 +225,12 @@ public class ReplChangeManager {
    *   to a deterministic location of cmroot. So user can retrieve the file back
    *   with the original location plus checksum.
    * @param conf
+   * @param name original filename
    * @param checkSum checksum of the file, can be retrieved by {@link #checksumFor(Path, FileSystem)}
    * @return Path
    */
-  static Path getCMPath(Configuration conf, String checkSum) throws IOException, MetaException {
-    String newFileName = checkSum;
+  static Path getCMPath(Configuration conf, String name, String checkSum) throws IOException, MetaException {
+    String newFileName = name + "_" + checkSum;
     int maxLength = conf.getInt(DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_KEY,
         DFSConfigKeys.DFS_NAMENODE_MAX_COMPONENT_LENGTH_DEFAULT);
 
@@ -260,14 +258,14 @@ public class ReplChangeManager {
       }
 
       if (!srcFs.exists(src)) {
-        return srcFs.getFileStatus(getCMPath(hiveConf, checksumString));
+        return srcFs.getFileStatus(getCMPath(hiveConf, src.getName(), checksumString));
       }
 
       String currentChecksumString = checksumFor(src, srcFs);
       if (currentChecksumString == null || checksumString.equals(currentChecksumString)) {
         return srcFs.getFileStatus(src);
       } else {
-        return srcFs.getFileStatus(getCMPath(hiveConf, checksumString));
+        return srcFs.getFileStatus(getCMPath(hiveConf, src.getName(), checksumString));
       }
     } catch (IOException e) {
       throw new MetaException(StringUtils.stringifyException(e));
