@@ -14,11 +14,6 @@
  */
 package org.apache.hive.config;
 
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.junit.Assert.assertThat;
-
 import org.junit.Test;
 
 import org.apache.hive.storage.jdbc.conf.DatabaseType;
@@ -29,7 +24,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-public class JdbcStorageConfigManagerTest {
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.Assert.assertThat;
+
+public class TestJdbcStorageConfigManager {
 
   @Test
   public void testWithAllRequiredSettingsDefined() {
