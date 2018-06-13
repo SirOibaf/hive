@@ -49,5 +49,13 @@ EXPLAIN SELECT cstring1 || '_'|| cstring2, substring(cstring2, 2, 3) as concat ,
 
 
 
+  -- Boolean Values
+ SELECT cboolean2, count(*) from druid_table_n0 GROUP BY cboolean2;
+  
+  -- Expected results of this query are wrong due to https://issues.apache.org/jira/browse/CALCITE-2319
+  -- It should get fixed once we upgrade calcite
+ SELECT ctinyint > 2, count(*) from druid_table_n0 GROUP BY ctinyint > 2;
+  
+ EXPLAIN SELECT ctinyint > 2, count(*) from druid_table_n0 GROUP BY ctinyint > 2;
 
-DROP TABLE druid_table;
+DROP TABLE druid_table_n0;
