@@ -110,7 +110,7 @@ public class VectorizedOrcAcidRowBatchReader
 
     final Reader reader = OrcInputFormat.createOrcReaderForSplit(conf, (OrcSplit) inputSplit);
     // Careful with the range here now, we do not want to read the whole base file like deltas.
-    innerReader = reader.rowsOptions(readerOptions.range(offset, length));
+    innerReader = reader.rowsOptions(readerOptions.range(offset, length), conf);
     baseReader = new org.apache.hadoop.mapred.RecordReader<NullWritable, VectorizedRowBatch>() {
 
       @Override
@@ -143,7 +143,13 @@ public class VectorizedOrcAcidRowBatchReader
         return innerReader.getProgress();
       }
     };
-    this.vectorizedRowBatchBase = ((RecordReaderImpl) innerReader).createRowBatch();
+    final boolean useDecimal64ColumnVectors = HiveConf
+      .getVar(conf, ConfVars.HIVE_VECTORIZED_INPUT_FORMAT_SUPPORTS_ENABLED).equalsIgnoreCase("decimal_64");
+    if (useDecimal64ColumnVectors) {
+      this.vectorizedRowBatchBase = ((RecordReaderImpl) innerReader).createRowBatch(true);
+    } else {
+      this.vectorizedRowBatchBase = ((RecordReaderImpl) innerReader).createRowBatch(false);
+    }
   }
 
   /**
@@ -859,10 +865,16 @@ public class VectorizedOrcAcidRowBatchReader
       private final boolean isBucketedTable;
 
       DeleteReaderValue(Reader deleteDeltaReader, Reader.Options readerOptions, int bucket,
-          ValidWriteIdList validWriteIdList, boolean isBucketedTable) throws IOException {
-        this.recordReader  = deleteDeltaReader.rowsOptions(readerOptions);
+        ValidWriteIdList validWriteIdList, boolean isBucketedTable, final JobConf conf) throws IOException {
+        this.recordReader  = deleteDeltaReader.rowsOptions(readerOptions, conf);
         this.bucketForSplit = bucket;
-        this.batch = deleteDeltaReader.getSchema().createRowBatch();
+        final boolean useDecimal64ColumnVector = HiveConf.getVar(conf, ConfVars
+          .HIVE_VECTORIZED_INPUT_FORMAT_SUPPORTS_ENABLED).equalsIgnoreCase("decimal_64");
+        if (useDecimal64ColumnVector) {
+          this.batch = deleteDeltaReader.getSchema().createRowBatchV2();
+        } else {
+          this.batch = deleteDeltaReader.getSchema().createRowBatch();
+        }
         if (!recordReader.nextBatch(batch)) { // Read the first batch.
           this.batch = null; // Oh! the first batch itself was null. Close the reader.
         }
@@ -1025,44 +1037,45 @@ public class VectorizedOrcAcidRowBatchReader
           int totalDeleteEventCount = 0;
           for (Path deleteDeltaDir : deleteDeltaDirs) {
             FileSystem fs = deleteDeltaDir.getFileSystem(conf);
-            for(Path deleteDeltaFile : OrcRawRecordMerger.getDeltaFiles(deleteDeltaDir, bucket, conf,
-              new OrcRawRecordMerger.Options().isCompacting(false), isBucketedTable)) {
-            // NOTE: Calling last flush length below is more for future-proofing when we have
-            // streaming deletes. But currently we don't support streaming deletes, and this can
-            // be removed if this becomes a performance issue.
-            long length = OrcAcidUtils.getLastFlushLength(fs, deleteDeltaFile);
-            // NOTE: A check for existence of deleteDeltaFile is required because we may not have
-            // deletes for the bucket being taken into consideration for this split processing.
-            if (length != -1 && fs.exists(deleteDeltaFile)) {
-              Reader deleteDeltaReader = OrcFile.createReader(deleteDeltaFile,
-                  OrcFile.readerOptions(conf).maxLength(length));
-              AcidStats acidStats = OrcAcidUtils.parseAcidStats(deleteDeltaReader);
-              if (acidStats.deletes == 0) {
-                continue; // just a safe check to ensure that we are not reading empty delete files.
-              }
-              totalDeleteEventCount += acidStats.deletes;
-              if (totalDeleteEventCount > maxEventsInMemory) {
-                // ColumnizedDeleteEventRegistry loads all the delete events from all the delete deltas
-                // into memory. To prevent out-of-memory errors, this check is a rough heuristic that
-                // prevents creation of an object of this class if the total number of delete events
-                // exceed this value. By default, it has been set to 10 million delete events per bucket.
-                LOG.info("Total number of delete events exceeds the maximum number of delete events "
-                    + "that can be loaded into memory for the delete deltas in the directory at : "
-                    + deleteDeltaDirs.toString() +". The max limit is currently set at "
-                    + maxEventsInMemory + " and can be changed by setting the Hive config variable "
-                    + ConfVars.HIVE_TRANSACTIONAL_NUM_EVENTS_IN_MEMORY.varname);
-                throw new DeleteEventsOverflowMemoryException();
-              }
-              DeleteReaderValue deleteReaderValue = new DeleteReaderValue(deleteDeltaReader,
-                  readerOptions, bucket, validWriteIdList, isBucketedTable);
-              DeleteRecordKey deleteRecordKey = new DeleteRecordKey();
-              if (deleteReaderValue.next(deleteRecordKey)) {
-                sortMerger.put(deleteRecordKey, deleteReaderValue);
-              } else {
-                deleteReaderValue.close();
+            Path[] deleteDeltaFiles = OrcRawRecordMerger.getDeltaFiles(deleteDeltaDir, bucket,
+                conf, new OrcRawRecordMerger.Options().isCompacting(false), isBucketedTable);
+            for (Path deleteDeltaFile : deleteDeltaFiles) {
+              // NOTE: Calling last flush length below is more for future-proofing when we have
+              // streaming deletes. But currently we don't support streaming deletes, and this can
+              // be removed if this becomes a performance issue.
+              long length = OrcAcidUtils.getLastFlushLength(fs, deleteDeltaFile);
+              // NOTE: A check for existence of deleteDeltaFile is required because we may not have
+              // deletes for the bucket being taken into consideration for this split processing.
+              if (length != -1 && fs.exists(deleteDeltaFile)) {
+                Reader deleteDeltaReader = OrcFile.createReader(deleteDeltaFile,
+                    OrcFile.readerOptions(conf).maxLength(length));
+                AcidStats acidStats = OrcAcidUtils.parseAcidStats(deleteDeltaReader);
+                if (acidStats.deletes == 0) {
+                  continue; // just a safe check to ensure that we are not reading empty delete files.
+                }
+                totalDeleteEventCount += acidStats.deletes;
+                if (totalDeleteEventCount > maxEventsInMemory) {
+                  // ColumnizedDeleteEventRegistry loads all the delete events from all the delete deltas
+                  // into memory. To prevent out-of-memory errors, this check is a rough heuristic that
+                  // prevents creation of an object of this class if the total number of delete events
+                  // exceed this value. By default, it has been set to 10 million delete events per bucket.
+                  LOG.info("Total number of delete events exceeds the maximum number of delete events "
+                      + "that can be loaded into memory for the delete deltas in the directory at : "
+                      + deleteDeltaDirs.toString() +". The max limit is currently set at "
+                      + maxEventsInMemory + " and can be changed by setting the Hive config variable "
+                      + ConfVars.HIVE_TRANSACTIONAL_NUM_EVENTS_IN_MEMORY.varname);
+                  throw new DeleteEventsOverflowMemoryException();
+                }
+                DeleteReaderValue deleteReaderValue = new DeleteReaderValue(deleteDeltaReader,
+                    readerOptions, bucket, validWriteIdList, isBucketedTable, conf);
+                DeleteRecordKey deleteRecordKey = new DeleteRecordKey();
+                if (deleteReaderValue.next(deleteRecordKey)) {
+                  sortMerger.put(deleteRecordKey, deleteReaderValue);
+                } else {
+                  deleteReaderValue.close();
+                }
               }
             }
-          }
           }
           if (totalDeleteEventCount > 0) {
             // Initialize the rowId array when we have some delete events.
