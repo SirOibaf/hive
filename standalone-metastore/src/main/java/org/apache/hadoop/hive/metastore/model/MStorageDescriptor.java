@@ -22,7 +22,6 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.model.helper.InodeHelper;
 import org.apache.hadoop.hive.metastore.model.helper.InodePK;
 
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
@@ -36,7 +35,7 @@ public class MStorageDescriptor {
   private MSerDeInfo serDeInfo;
   private List<String> bucketCols;
   private List<MOrder> sortCols;
-  private Map<String, String> parameters;
+  private Map<String, MParam> parameters;
   private List<String> skewedColNames;
   private List<MStringList> skewedColValues;
   private Map<MStringList, String> skewedColValueLocationMaps;
@@ -70,7 +69,7 @@ public class MStorageDescriptor {
    */
   public MStorageDescriptor(MColumnDescriptor cd, String location, String inputFormat,
       String outputFormat, boolean isCompressed, int numBuckets, MSerDeInfo serDeInfo,
-      List<String> bucketCols, List<MOrder> sortOrder, Map<String, String> parameters,
+      List<String> bucketCols, List<MOrder> sortOrder, Map<String, MParam> parameters,
       List<String> skewedColNames, List<MStringList> skewedColValues,
       Map<MStringList, String> skewedColValueLocationMaps, boolean storedAsSubDirectories,
       Long partitionId, Long parentId, String name) throws MetaException {
@@ -180,14 +179,14 @@ public class MStorageDescriptor {
   /**
    * @return the parameters
    */
-  public Map<String, String> getParameters() {
+  public Map<String, MParam> getParameters() {
     return parameters;
   }
 
   /**
    * @param parameters the parameters to set
    */
-  public void setParameters(Map<String, String> parameters) {
+  public void setParameters(Map<String, MParam> parameters) {
     this.parameters = parameters;
   }
 

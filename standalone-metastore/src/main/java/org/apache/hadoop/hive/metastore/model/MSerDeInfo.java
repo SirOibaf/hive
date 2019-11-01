@@ -23,7 +23,7 @@ import java.util.Map;
 public class MSerDeInfo {
   private String name;
   private String serializationLib;
-  private Map<String, String> parameters;
+  private Map<String, MParam> parameters;
   private String description;
   private String serializerClass;
   private String deserializerClass;
@@ -39,7 +39,7 @@ public class MSerDeInfo {
    * @param deserializerClass
    * @param serdeType
    */
-  public MSerDeInfo(String name, String serializationLib, Map<String, String> parameters,
+  public MSerDeInfo(String name, String serializationLib, Map<String, MParam> parameters,
                     String description, String serializerClass, String deserializerClass,
                     int serdeType) {
     this.name = name;
@@ -82,14 +82,14 @@ public class MSerDeInfo {
   /**
    * @return the parameters
    */
-  public Map<String, String> getParameters() {
+  public Map<String, MParam> getParameters() {
     return parameters;
   }
 
   /**
    * @param parameters the parameters to set
    */
-  public void setParameters(Map<String, String> parameters) {
+  public void setParameters(Map<String, MParam> parameters) {
     this.parameters = parameters;
   }
 

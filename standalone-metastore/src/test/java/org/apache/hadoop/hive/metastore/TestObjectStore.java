@@ -20,6 +20,7 @@ package org.apache.hadoop.hive.metastore;
 import com.codahale.metrics.Counter;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
+import org.apache.commons.lang.RandomStringUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.ObjectStore.RetryingExecutor;
 import org.apache.hadoop.conf.Configuration;
@@ -291,11 +292,54 @@ public class TestObjectStore {
     objectStore.dropDatabase(db1.getCatalogName(), DB1);
   }
 
+  /**
+   * Test view operations
+   */
+  @Test
+  public void testViewOps() throws MetaException, InvalidObjectException, NoSuchObjectException, InvalidInputException {
+    Path db1Path = new Path(wh.getWhRoot(), DB1);
+    wh.mkdirs(db1Path);
+    Database db1 = new DatabaseBuilder()
+        .setName(DB1)
+        .setDescription("description")
+        .setLocation(db1Path.toString())
+        .build(conf);
+    objectStore.createDatabase(db1);
+
+    String emptyView = "emtpyview";
+    Path emptyViewPath = new Path(db1Path, emptyView);
+    wh.mkdirs(emptyViewPath);
+    StorageDescriptor sd = createFakeSd(emptyViewPath.toString(), ImmutableList.of(new FieldSchema("pk_col", "double", null)));
+    HashMap<String,String> params = new HashMap<String,String>();
+    params.put("EXTERNAL", "false");
+
+    Table emptyViewTbl = new Table(emptyView, DB1, "owner", 1, 2, 3, sd, null, params, "", "", "VIRTUAL_VIEW");
+    objectStore.createTable(emptyViewTbl);
+
+    Assert.assertEquals(objectStore.getTable(DEFAULT_CATALOG_NAME, DB1, emptyView).getViewExpandedText(), "");
+    Assert.assertEquals(objectStore.getTable(DEFAULT_CATALOG_NAME, DB1, emptyView).getViewOriginalText(), "");
+
+    String longView = "longview";
+    Path longViewPath = new Path(db1Path, longView);
+    wh.mkdirs(longViewPath);
+    sd = createFakeSd(longViewPath.toString(), ImmutableList.of(new FieldSchema("pk_col", "double", null)));
+    String longViewContent = RandomStringUtils.random(15000);
+
+    Table longViewTbl = new Table(longView, DB1, "owner", 1, 2, 3, sd, null, params, longViewContent, longViewContent, "VIRTUAL_VIEW");
+    objectStore.createTable(longViewTbl);
+
+    Assert.assertEquals(objectStore.getTable(DEFAULT_CATALOG_NAME, DB1, longView).getViewExpandedText(), longViewContent);
+    Assert.assertEquals(objectStore.getTable(DEFAULT_CATALOG_NAME, DB1, longView).getViewOriginalText(), longViewContent);
+
+    objectStore.dropTable(DEFAULT_CATALOG_NAME, DB1, emptyView);
+    objectStore.dropTable(DEFAULT_CATALOG_NAME, DB1, longView);
+    objectStore.dropDatabase(db1.getCatalogName(), DB1);
+  }
+
   private StorageDescriptor createFakeSd(String location, List<FieldSchema> cols) {
     return new StorageDescriptor(cols, location, null, null, false, 0,
         new SerDeInfo("SerDeName", "serializationLib", null), null, null, null);
   }
-
 
   /**
    * Tests partition operations

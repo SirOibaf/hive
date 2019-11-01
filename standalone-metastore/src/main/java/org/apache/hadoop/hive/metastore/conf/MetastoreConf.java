@@ -946,7 +946,10 @@ public class MetastoreConf {
         "enable hops metadata consistency. This option is meant to be disabled for testing purposes"),
     HIVE_SUPER_USER("hive.superuser", "hive.superuser", "hive", "The user to use to create databases"),
     CERT_RELOAD_THREAD_SLEEP("cert.reload.thread.sleep", "cert.reload.thread.sleep", 60000,
-        "Sleep time for the certificate reloader thread - default 1m");
+        "Sleep time for the certificate reloader thread - default 1m"),
+    LONG_TEXT_CHUCK_SIZE("metastore.text.chunk.size", "metastore.text.chunk.size",
+        13000, "Views are split into chunks and stored in a separate table. " +
+        "This parameter defines the size of the chunks and it should be < than the size of the column");
 
     private final String varname;
     private final String hiveName;

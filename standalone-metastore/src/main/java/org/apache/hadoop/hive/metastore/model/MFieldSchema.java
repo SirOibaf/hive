@@ -21,12 +21,14 @@
  */
 package org.apache.hadoop.hive.metastore.model;
 
+import java.util.List;
+
 /**
  * Represent a column or a type of a table or object
  */
 public class MFieldSchema {
   private String name;
-  private String type;
+  private List<String> type;
   private String comment;
   public MFieldSchema() {}
 
@@ -35,7 +37,7 @@ public class MFieldSchema {
    * @param name
    * @param type
    */
-  public MFieldSchema(String name, String type, String comment) {
+  public MFieldSchema(String name, List<String> type, String comment) {
     this.comment = comment;
     this.name = name;
     this.type = type;
@@ -67,13 +69,13 @@ public class MFieldSchema {
   /**
    * @return the type
    */
-  public String getType() {
+  public List<String> getType() {
     return type;
   }
   /**
    * @param field the type to set
    */
-  public void setType(String field) {
+  public void setType(List<String> field) {
     this.type = field;
   }
   

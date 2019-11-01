@@ -32,9 +32,9 @@ public class MTable {
   private int lastAccessTime;
   private int retention;
   private List<MFieldSchema> partitionKeys;
-  private Map<String, String> parameters;
-  private String viewOriginalText;
-  private String viewExpandedText;
+  private Map<String, MParam> parameters;
+  private List<String> viewOriginalText;
+  private List<String> viewExpandedText;
   private boolean rewriteEnabled;
   private String tableType;
 
@@ -57,7 +57,7 @@ public class MTable {
    */
   public MTable(String tableName, MDatabase database, MStorageDescriptor sd, String owner, String ownerType,
       int createTime, int lastAccessTime, int retention, List<MFieldSchema> partitionKeys,
-      Map<String, String> parameters, String viewOriginalText, String viewExpandedText,
+      Map<String, MParam> parameters, List<String> viewOriginalText, List<String> viewExpandedText,
       boolean rewriteEnabled, String tableType) {
     this.tableName = tableName;
     this.database = database;
@@ -120,42 +120,42 @@ public class MTable {
   /**
    * @return the parameters
    */
-  public Map<String, String> getParameters() {
+  public Map<String, MParam> getParameters() {
     return parameters;
   }
 
   /**
    * @param parameters the parameters to set
    */
-  public void setParameters(Map<String, String> parameters) {
+  public void setParameters(Map<String, MParam> parameters) {
     this.parameters = parameters;
   }
 
   /**
    * @return the original view text, or null if this table is not a view
    */
-  public String getViewOriginalText() {
+  public List<String> getViewOriginalText() {
     return viewOriginalText;
   }
 
   /**
    * @param viewOriginalText the original view text to set
    */
-  public void setViewOriginalText(String viewOriginalText) {
+  public void setViewOriginalText(List<String> viewOriginalText) {
     this.viewOriginalText = viewOriginalText;
   }
 
   /**
    * @return the expanded view text, or null if this table is not a view
    */
-  public String getViewExpandedText() {
+  public List<String> getViewExpandedText() {
     return viewExpandedText;
   }
 
   /**
    * @param viewExpandedText the expanded view text to set
    */
-  public void setViewExpandedText(String viewExpandedText) {
+  public void setViewExpandedText(List<String> viewExpandedText) {
     this.viewExpandedText = viewExpandedText;
   }
 

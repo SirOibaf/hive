@@ -56,6 +56,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import javax.jdo.JDOCanRetryException;
 import javax.jdo.JDODataStoreException;
 import javax.jdo.JDOException;
@@ -70,6 +71,7 @@ import javax.jdo.datastore.JDOConnection;
 import javax.jdo.identity.IntIdentity;
 import javax.sql.DataSource;
 
+import com.google.common.base.Splitter;
 import com.google.common.base.Strings;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.ArrayUtils;
@@ -179,6 +181,7 @@ import org.apache.hadoop.hive.metastore.model.MMetastoreDBProperties;
 import org.apache.hadoop.hive.metastore.model.MNotificationLog;
 import org.apache.hadoop.hive.metastore.model.MNotificationNextId;
 import org.apache.hadoop.hive.metastore.model.MOrder;
+import org.apache.hadoop.hive.metastore.model.MParam;
 import org.apache.hadoop.hive.metastore.model.MPartition;
 import org.apache.hadoop.hive.metastore.model.MPartitionColumnPrivilege;
 import org.apache.hadoop.hive.metastore.model.MPartitionColumnStatistics;
@@ -196,7 +199,6 @@ import org.apache.hadoop.hive.metastore.model.MTable;
 import org.apache.hadoop.hive.metastore.model.MTableColumnPrivilege;
 import org.apache.hadoop.hive.metastore.model.MTableColumnStatistics;
 import org.apache.hadoop.hive.metastore.model.MTablePrivilege;
-import org.apache.hadoop.hive.metastore.model.MTableWrite;
 import org.apache.hadoop.hive.metastore.model.MType;
 import org.apache.hadoop.hive.metastore.model.MVersionTable;
 import org.apache.hadoop.hive.metastore.model.MWMMapping;
@@ -1176,7 +1178,7 @@ public class ObjectStore implements RawStore, Configurable {
     List<MFieldSchema> fields = new ArrayList<>();
     if (type.getFields() != null) {
       for (FieldSchema field : type.getFields()) {
-        fields.add(new MFieldSchema(field.getName(), field.getType(), field
+        fields.add(new MFieldSchema(field.getName(), convertToChunks(field.getType()), field
             .getComment()));
       }
     }
@@ -1187,7 +1189,7 @@ public class ObjectStore implements RawStore, Configurable {
     List<FieldSchema> fields = new ArrayList<>();
     if (mtype.getFields() != null) {
       for (MFieldSchema field : mtype.getFields()) {
-        fields.add(new FieldSchema(field.getName(), field.getType(), field
+        fields.add(new FieldSchema(field.getName(), convertToText(field.getType()), field
             .getComment()));
       }
     }
@@ -1704,7 +1706,7 @@ public class ObjectStore implements RawStore, Configurable {
       for (MTable table : tables) {
         TableMeta metaData = new TableMeta(
             table.getDatabase().getName(), table.getTableName(), table.getTableType());
-        metaData.setComments(table.getParameters().get("comment"));
+        metaData.setComments(convertToTextMap(table.getParameters()).get("comment"));
         metas.add(metaData);
       }
       commited = commitTransaction();
@@ -1848,7 +1850,6 @@ public class ObjectStore implements RawStore, Configurable {
         lowered_tbl_names.add(normalizeIdentifier(t));
       }
       query = pm.newQuery(MTable.class);
-//<<<<<<< HEAD
       query.setFilter("database.name == db && database.catalogName == cat && tbl_names.contains(tableName)");
       query.declareParameters("java.lang.String db, java.lang.String cat, java.util.Collection tbl_names");
       Collection mtables = (Collection) query.execute(db, catName, lowered_tbl_names);
@@ -1890,10 +1891,42 @@ public class ObjectStore implements RawStore, Configurable {
     return (dnList == null) ? null : Lists.newArrayList(dnList);
   }
 
+  private Map<String, String> convertToTextMap(Map<String, MParam> dnMap) {
+    if (dnMap != null) {
+      Map<String, String> textMap = dnMap.entrySet().stream()
+          .collect(Collectors.toMap(Map.Entry::getKey, e -> convertToText(e.getValue().getChunks())));
+      return convertMap(textMap);
+    }
+
+    return null;
+  }
+
   /** Makes shallow copy of a map to avoid DataNucleus mucking with our objects. */
-  private Map<String, String> convertMap(Map<String, String> dnMap) {
-    return MetaStoreUtils.trimMapNulls(dnMap,
+  private Map<String, String> convertMap(Map<String, String> map) {
+    return MetaStoreUtils.trimMapNulls(map,
         MetastoreConf.getBoolVar(getConf(), ConfVars.ORM_RETRIEVE_MAPNULLS_AS_EMPTY_STRINGS));
+  }
+
+  private Map<String, MParam> convertToMMap(Map<String, String> map) {
+    if (map != null) {
+      return map.entrySet().stream()
+          .collect(Collectors.toMap(Map.Entry::getKey, e -> new MParam(convertToChunks(e.getValue()))));
+    }
+
+    return null;
+  }
+
+  private String convertToText(List<String> textChunks) {
+    return String.join("", textChunks);
+  }
+
+  private List<String> convertToChunks(String text) {
+    if (text != null) {
+      return Splitter.fixedLength(MetastoreConf.getIntVar(getConf(), ConfVars.LONG_TEXT_CHUCK_SIZE))
+          .splitToList(text);
+    } else {
+      return null;
+    }
   }
 
   private Table convertToTable(MTable mtbl) throws MetaException {
@@ -1905,7 +1938,7 @@ public class ObjectStore implements RawStore, Configurable {
       // for backwards compatibility with old metastore persistence
       if (mtbl.getViewOriginalText() != null) {
         tableType = TableType.VIRTUAL_VIEW.toString();
-      } else if (Boolean.parseBoolean(mtbl.getParameters().get("EXTERNAL"))) {
+      } else if (Boolean.parseBoolean(convertToTextMap(mtbl.getParameters()).get("EXTERNAL"))) {
         tableType = TableType.EXTERNAL_TABLE.toString();
       } else {
         tableType = TableType.MANAGED_TABLE.toString();
@@ -1914,8 +1947,8 @@ public class ObjectStore implements RawStore, Configurable {
     Table t = new Table(mtbl.getTableName(), mtbl.getDatabase().getName(), mtbl
         .getOwner(), mtbl.getCreateTime(), mtbl.getLastAccessTime(), mtbl
         .getRetention(), convertToStorageDescriptor(mtbl.getSd()),
-        convertToFieldSchemas(mtbl.getPartitionKeys()), convertMap(mtbl.getParameters()),
-        mtbl.getViewOriginalText(), mtbl.getViewExpandedText(), tableType);
+        convertToFieldSchemas(mtbl.getPartitionKeys()), this.convertToTextMap(mtbl.getParameters()),
+        convertToText(mtbl.getViewOriginalText()), convertToText(mtbl.getViewExpandedText()), tableType);
 
     if (Strings.isNullOrEmpty(mtbl.getOwnerType())) {
       // Before the ownerType exists in an old Hive schema, USER was the default type for owner.
@@ -1967,8 +2000,8 @@ public class ObjectStore implements RawStore, Configurable {
     return new MTable(normalizeIdentifier(tbl.getTableName()), mdb,
         convertToMStorageDescriptor(tbl.getSd()), tbl.getOwner(), ownerType, tbl
         .getCreateTime(), tbl.getLastAccessTime(), tbl.getRetention(),
-        convertToMFieldSchemas(tbl.getPartitionKeys()), tbl.getParameters(),
-        tbl.getViewOriginalText(), tbl.getViewExpandedText(), tbl.isRewriteEnabled(),
+        convertToMFieldSchemas(tbl.getPartitionKeys()), convertToMMap(tbl.getParameters()),
+        convertToChunks(tbl.getViewOriginalText()), convertToChunks(tbl.getViewExpandedText()), tbl.isRewriteEnabled(),
         tableType);
   }
 
@@ -1978,7 +2011,7 @@ public class ObjectStore implements RawStore, Configurable {
       mkeys = new ArrayList<>(keys.size());
       for (FieldSchema part : keys) {
         mkeys.add(new MFieldSchema(part.getName().toLowerCase(),
-            part.getType(), part.getComment()));
+            convertToChunks(part.getType()), part.getComment()));
       }
     }
     return mkeys;
@@ -1989,7 +2022,7 @@ public class ObjectStore implements RawStore, Configurable {
     if (mkeys != null) {
       keys = new ArrayList<>(mkeys.size());
       for (MFieldSchema part : mkeys) {
-        keys.add(new FieldSchema(part.getName(), part.getType(), part
+        keys.add(new FieldSchema(part.getName(), convertToText(part.getType()), part
             .getComment()));
       }
     }
@@ -2023,7 +2056,7 @@ public class ObjectStore implements RawStore, Configurable {
       throw new MetaException("Invalid SerDeInfo object");
     }
     SerDeInfo serde =
-        new SerDeInfo(ms.getName(), ms.getSerializationLib(), convertMap(ms.getParameters()));
+        new SerDeInfo(ms.getName(), ms.getSerializationLib(), this.convertToTextMap(ms.getParameters()));
     if (ms.getDescription() != null) {
       serde.setDescription(ms.getDescription());
     }
@@ -2043,7 +2076,7 @@ public class ObjectStore implements RawStore, Configurable {
     if (ms == null) {
       throw new MetaException("Invalid SerDeInfo object");
     }
-    return new MSerDeInfo(ms.getName(), ms.getSerializationLib(), ms.getParameters(),
+    return new MSerDeInfo(ms.getName(), ms.getSerializationLib(), convertToMMap(ms.getParameters()),
         ms.getDescription(), ms.getSerializerClass(), ms.getDeserializerClass(),
         ms.getSerdeType() == null ? 0 : ms.getSerdeType().getValue());
   }
@@ -2074,7 +2107,7 @@ public class ObjectStore implements RawStore, Configurable {
         msd.getLocation(), msd.getInputFormat(), msd.getOutputFormat(), msd
         .isCompressed(), msd.getNumBuckets(), convertToSerDeInfo(msd
         .getSerDeInfo()), convertList(msd.getBucketCols()), convertToOrders(msd
-        .getSortCols()), convertMap(msd.getParameters()));
+        .getSortCols()), this.convertToTextMap(msd.getParameters()));
     SkewedInfo skewedInfo = new SkewedInfo(convertList(msd.getSkewedColNames()),
         convertToSkewedValues(msd.getSkewedColValues()),
         covertToSkewedMap(msd.getSkewedColValueLocationMaps()));
@@ -2184,7 +2217,7 @@ public class ObjectStore implements RawStore, Configurable {
         .getLocation(), sd.getInputFormat(), sd.getOutputFormat(), sd
         .isCompressed(), sd.getNumBuckets(), convertToMSerDeInfo(sd
         .getSerdeInfo()), sd.getBucketCols(),
-        convertToMOrders(sd.getSortCols()), sd.getParameters(),
+        convertToMOrders(sd.getSortCols()), convertToMMap(sd.getParameters()),
         (null == sd.getSkewedInfo()) ? null
             : sd.getSkewedInfo().getSkewedColNames(),
         convertToMStringLists((null == sd.getSkewedInfo()) ? null : sd.getSkewedInfo()
@@ -2236,7 +2269,7 @@ public class ObjectStore implements RawStore, Configurable {
       List<MTablePrivilege> tabGrants = null;
       List<MTableColumnPrivilege> tabColumnGrants = null;
       MTable table = this.getMTable(catName, dbName, tblName);
-      if ("TRUE".equalsIgnoreCase(table.getParameters().get("PARTITION_LEVEL_PRIVILEGE"))) {
+      if ("TRUE".equalsIgnoreCase(this.convertToTextMap(table.getParameters()).get("PARTITION_LEVEL_PRIVILEGE"))) {
         tabGrants = this.listAllTableGrants(catName, dbName, tblName);
         tabColumnGrants = this.listTableAllColumnGrants(catName, dbName, tblName);
       }
@@ -2301,7 +2334,7 @@ public class ObjectStore implements RawStore, Configurable {
       List<MTablePrivilege> tabGrants = null;
       List<MTableColumnPrivilege> tabColumnGrants = null;
       MTable table = this.getMTable(catName, dbName, tblName);
-      if ("TRUE".equalsIgnoreCase(table.getParameters().get("PARTITION_LEVEL_PRIVILEGE"))) {
+      if ("TRUE".equalsIgnoreCase(this.convertToTextMap(table.getParameters()).get("PARTITION_LEVEL_PRIVILEGE"))) {
         tabGrants = this.listAllTableGrants(catName, dbName, tblName);
         tabColumnGrants = this.listTableAllColumnGrants(catName, dbName, tblName);
       }
@@ -2358,7 +2391,7 @@ public class ObjectStore implements RawStore, Configurable {
       MTable table = this.getMTable(catName, part.getDbName(), part.getTableName());
       List<MTablePrivilege> tabGrants = null;
       List<MTableColumnPrivilege> tabColumnGrants = null;
-      if ("TRUE".equalsIgnoreCase(table.getParameters().get("PARTITION_LEVEL_PRIVILEGE"))) {
+      if ("TRUE".equalsIgnoreCase(this.convertToTextMap(table.getParameters()).get("PARTITION_LEVEL_PRIVILEGE"))) {
         tabGrants = this.listAllTableGrants(catName, part.getDbName(), part.getTableName());
         tabColumnGrants = this.listTableAllColumnGrants(
             catName, part.getDbName(), part.getTableName());
@@ -2688,7 +2721,7 @@ public class ObjectStore implements RawStore, Configurable {
           Partition part = convertToPart(mpart);
           parts.add(part);
 
-          if ("TRUE".equalsIgnoreCase(mtbl.getParameters().get("PARTITION_LEVEL_PRIVILEGE"))) {
+          if ("TRUE".equalsIgnoreCase(convertToTextMap(mtbl.getParameters()).get("PARTITION_LEVEL_PRIVILEGE"))) {
             String partName = Warehouse.makePartName(this.convertToFieldSchemas(mtbl
                 .getPartitionKeys()), part.getValues());
             PrincipalPrivilegeSet partAuth = this.getPartitionPrivilegeSet(catName, dbName,
@@ -2720,7 +2753,7 @@ public class ObjectStore implements RawStore, Configurable {
       Partition part = null;
       MTable mtbl = mpart.getTable();
       part = convertToPart(mpart);
-      if ("TRUE".equalsIgnoreCase(mtbl.getParameters().get("PARTITION_LEVEL_PRIVILEGE"))) {
+      if ("TRUE".equalsIgnoreCase(convertToTextMap(mtbl.getParameters()).get("PARTITION_LEVEL_PRIVILEGE"))) {
         String partName = Warehouse.makePartName(this.convertToFieldSchemas(mtbl
             .getPartitionKeys()), partVals);
         PrincipalPrivilegeSet partAuth = this.getPartitionPrivilegeSet(catName, dbName,
@@ -3121,7 +3154,7 @@ public class ObjectStore implements RawStore, Configurable {
         Partition part = convertToPart((MPartition) o);
         //set auth privileges
         if (null != userName && null != groupNames &&
-            "TRUE".equalsIgnoreCase(mtbl.getParameters().get("PARTITION_LEVEL_PRIVILEGE"))) {
+            "TRUE".equalsIgnoreCase(convertToTextMap(mtbl.getParameters()).get("PARTITION_LEVEL_PRIVILEGE"))) {
           String partName = Warehouse.makePartName(this.convertToFieldSchemas(mtbl
               .getPartitionKeys()), part.getValues());
           PrincipalPrivilegeSet partAuth = getPartitionPrivilegeSet(catName, db_name,
@@ -4189,7 +4222,7 @@ public class ObjectStore implements RawStore, Configurable {
     removeUnusedColumnDescriptor(mcd);
   }
 
-  private static MFieldSchema getColumnFromTableColumns(List<MFieldSchema> cols, String col) {
+  private MFieldSchema getColumnFromTableColumns(List<MFieldSchema> cols, String col) {
     if (cols == null) {
       return null;
     }
@@ -4476,7 +4509,7 @@ public class ObjectStore implements RawStore, Configurable {
           );
           mpkfks.add(mpkfk);
 
-          final String fkColType = getColumnFromTableColumns(childCols, fkColumnName).getType();
+          final String fkColType = convertToText(getColumnFromTableColumns(childCols, fkColumnName).getType());
           fkSignature.append(
               generateColNameTypeSignature(fkColumnName, fkColType));
           referencedKSignature.append(
@@ -4505,7 +4538,7 @@ public class ObjectStore implements RawStore, Configurable {
     return fkNames;
   }
 
-  private static Set<String> generateValidPKsOrUniqueSignatures(List<MFieldSchema> tableCols,
+  private Set<String> generateValidPKsOrUniqueSignatures(List<MFieldSchema> tableCols,
       List<SQLPrimaryKey> refTablePrimaryKeys, List<SQLUniqueConstraint> refTableUniqueConstraints) {
     final Set<String> validPKsOrUnique = new HashSet<>();
     if (!refTablePrimaryKeys.isEmpty()) {
@@ -4521,7 +4554,7 @@ public class ObjectStore implements RawStore, Configurable {
       for (SQLPrimaryKey pk : refTablePrimaryKeys) {
         pkSignature.append(
             generateColNameTypeSignature(
-                pk.getColumn_name(), getColumnFromTableColumns(tableCols, pk.getColumn_name()).getType()));
+                pk.getColumn_name(), convertToText(getColumnFromTableColumns(tableCols, pk.getColumn_name()).getType())));
       }
       validPKsOrUnique.add(pkSignature.toString());
     }
@@ -4539,7 +4572,7 @@ public class ObjectStore implements RawStore, Configurable {
         SQLUniqueConstraint uk = refTableUniqueConstraints.get(j);
         ukSignature.append(
             generateColNameTypeSignature(
-                uk.getColumn_name(), getColumnFromTableColumns(tableCols, uk.getColumn_name()).getType()));
+                uk.getColumn_name(), convertToText(getColumnFromTableColumns(tableCols, uk.getColumn_name()).getType())));
         if (j + 1 < refTableUniqueConstraints.size()) {
           if (!refTableUniqueConstraints.get(j + 1).getUk_name().equals(
                   refTableUniqueConstraints.get(j).getUk_name())) {
@@ -7693,7 +7726,7 @@ public class ObjectStore implements RawStore, Configurable {
 
       for (MTable mTbl : mTbls) {
         updatePropURIHelper(oldLoc, newLoc, tblPropKey, isDryRun, badRecords, updateLocations,
-            mTbl.getParameters());
+            convertToTextMap(mTbl.getParameters()));
       }
       committed = commitTransaction();
       if (committed) {
@@ -7727,7 +7760,7 @@ public class ObjectStore implements RawStore, Configurable {
       pm.retrieveAll(mSDSs);
       for (MStorageDescriptor mSDS : mSDSs) {
         updatePropURIHelper(oldLoc, newLoc, tblPropKey, isDryRun, badRecords, updateLocations,
-            mSDS.getParameters());
+            convertToTextMap(mSDS.getParameters()));
       }
       committed = commitTransaction();
       if (committed) {
@@ -7877,7 +7910,7 @@ public class ObjectStore implements RawStore, Configurable {
       pm.retrieveAll(mSerdes);
       for (MSerDeInfo mSerde : mSerdes) {
         if (mSerde.getParameters().containsKey(serdeProp)) {
-          String schemaLoc = mSerde.getParameters().get(serdeProp);
+          String schemaLoc = convertToTextMap(mSerde.getParameters()).get(serdeProp);
           URI schemaLocURI = null;
           try {
             schemaLocURI = new Path(schemaLoc).toUri();
@@ -7891,7 +7924,7 @@ public class ObjectStore implements RawStore, Configurable {
               String newSchemaLoc = schemaLoc.replaceAll(oldLoc.toString(), newLoc.toString());
               updateLocations.put(schemaLocURI.toString(), newSchemaLoc);
               if (!isDryRun) {
-                mSerde.getParameters().put(serdeProp, newSchemaLoc);
+                mSerde.getParameters().put(serdeProp, new MParam(convertToChunks(newSchemaLoc)));
               }
             }
           }
@@ -8039,7 +8072,7 @@ public class ObjectStore implements RawStore, Configurable {
       MTable oldt = getMTable(catName, dbname, name);
       Map<String, String> parameters = table.getParameters();
       StatsSetupConst.setColumnStatsState(parameters, colNames);
-      oldt.setParameters(parameters);
+      oldt.setParameters(convertToMMap(parameters));
 
       committed = commitTransaction();
       return committed;
