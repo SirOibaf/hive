@@ -21,15 +21,15 @@ package org.apache.hadoop.hive.metastore.model;
 import java.util.List;
 
 /**
- * MParam
+ * MTableParam
  * Wrapper around a list of string chunks that make up the param value
  */
-public class MParam {
+public class MTableParam {
   private List<String> chunks;
 
-  public MParam() {}
+  public MTableParam() {}
 
-  public MParam(List<String> chunks) {
+  public MTableParam(List<String> chunks) {
     this.chunks = chunks;
   }
 

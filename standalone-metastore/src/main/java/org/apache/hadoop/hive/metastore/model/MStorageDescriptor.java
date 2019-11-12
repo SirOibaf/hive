@@ -35,7 +35,7 @@ public class MStorageDescriptor {
   private MSerDeInfo serDeInfo;
   private List<String> bucketCols;
   private List<MOrder> sortCols;
-  private Map<String, MParam> parameters;
+  private Map<String, MSDSParam> parameters;
   private List<String> skewedColNames;
   private List<MStringList> skewedColValues;
   private Map<MStringList, String> skewedColValueLocationMaps;
@@ -69,7 +69,7 @@ public class MStorageDescriptor {
    */
   public MStorageDescriptor(MColumnDescriptor cd, String location, String inputFormat,
       String outputFormat, boolean isCompressed, int numBuckets, MSerDeInfo serDeInfo,
-      List<String> bucketCols, List<MOrder> sortOrder, Map<String, MParam> parameters,
+      List<String> bucketCols, List<MOrder> sortOrder, Map<String, MSDSParam> parameters,
       List<String> skewedColNames, List<MStringList> skewedColValues,
       Map<MStringList, String> skewedColValueLocationMaps, boolean storedAsSubDirectories,
       Long partitionId, Long parentId, String name) throws MetaException {
@@ -179,14 +179,14 @@ public class MStorageDescriptor {
   /**
    * @return the parameters
    */
-  public Map<String, MParam> getParameters() {
+  public Map<String, MSDSParam> getParameters() {
     return parameters;
   }
 
   /**
    * @param parameters the parameters to set
    */
-  public void setParameters(Map<String, MParam> parameters) {
+  public void setParameters(Map<String, MSDSParam> parameters) {
     this.parameters = parameters;
   }
 

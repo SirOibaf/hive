@@ -32,7 +32,7 @@ public class MTable {
   private int lastAccessTime;
   private int retention;
   private List<MFieldSchema> partitionKeys;
-  private Map<String, MParam> parameters;
+  private Map<String, MTableParam> parameters;
   private List<String> viewOriginalText;
   private List<String> viewExpandedText;
   private boolean rewriteEnabled;
@@ -56,9 +56,9 @@ public class MTable {
    * @param tableType
    */
   public MTable(String tableName, MDatabase database, MStorageDescriptor sd, String owner, String ownerType,
-      int createTime, int lastAccessTime, int retention, List<MFieldSchema> partitionKeys,
-      Map<String, MParam> parameters, List<String> viewOriginalText, List<String> viewExpandedText,
-      boolean rewriteEnabled, String tableType) {
+                int createTime, int lastAccessTime, int retention, List<MFieldSchema> partitionKeys,
+                Map<String, MTableParam> parameters, List<String> viewOriginalText, List<String> viewExpandedText,
+                boolean rewriteEnabled, String tableType) {
     this.tableName = tableName;
     this.database = database;
     this.sd = sd;
@@ -120,14 +120,14 @@ public class MTable {
   /**
    * @return the parameters
    */
-  public Map<String, MParam> getParameters() {
+  public Map<String, MTableParam> getParameters() {
     return parameters;
   }
 
   /**
    * @param parameters the parameters to set
    */
-  public void setParameters(Map<String, MParam> parameters) {
+  public void setParameters(Map<String, MTableParam> parameters) {
     this.parameters = parameters;
   }
 

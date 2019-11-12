@@ -135,6 +135,14 @@
       </field>
     </class>
 
+    <class name="MTableParam" table="TABLE_PARAMS_CHUNKS">
+      <datastore-identity/>
+      <field name="chunks">
+        <collection element-type="java.lang.String"/>
+        <column name="CHUNK" jdbc-type="VARCHAR" length="13000" />
+      </field>
+    </class>
+
     <class name="MTable" table="TBLS" identity-type="datastore" detachable="true">
       <datastore-identity>
         <column name="TBL_ID"/>
@@ -194,17 +202,11 @@
         <column name="RETENTION" jdbc-type="integer"/>
       </field>
       <field name="parameters" table="TABLE_PARAMS">
-        <map key-type="java.lang.String" value-type="java.lang.String"/>
+        <map key-type="java.lang.String" value-type="org.apache.hadoop.hive.metastore.model.MTableParam"/>
         <join>
           <column name="TBL_ID"/>
           <foreign-key name="PARAM_TBL_FK" delete-action="cascade"/>
         </join>
-        <key>
-           <column name="PARAM_KEY" length="256" jdbc-type="VARCHAR"/>
-        </key>
-        <value>
-           <column name="PARAM_VALUE" length="32672" jdbc-type="VARCHAR"/>
-        </value>
       </field>
       <field name="viewOriginalText" table="VIEW_ORG_TEXT">
         <collection element-type="java.lang.String"/>
@@ -296,15 +298,11 @@
       </field>
     </class>
 
-    <class name="MParam" identity-type="datastore" table="PARAMS">
-      <datastore-identity>
-        <column name="PARAM_ID"/>
-      </datastore-identity>
+    <class name="MSerdeParam" identity-type="datastore" table="SERDE_PARAMS_CHUNKS">
+      <datastore-identity/>
       <field name="chunks">
         <collection element-type="java.lang.String"/>
-        <element column="CHUNK">
-            <column></column>
-        </element>
+        <column name="CHUNK" jdbc-type="VARCHAR" length="13000" />
       </field>
     </class>
 
@@ -319,21 +317,11 @@
         <column name="SLIB" length="4000" jdbc-type="VARCHAR" allows-null="true"/>
       </field>
       <field name="parameters" table="SERDE_PARAMS">
-        <map key-type="java.lang.String" value-type="org.apache.hadoop.hive.metastore.model.MParam"/>
+        <map key-type="java.lang.String" value-type="org.apache.hadoop.hive.metastore.model.MSerdeParam"/>
         <join>
           <column name="SERDE_ID"/>
           <foreign-key name="SERDE_PARAMS_FK" delete-action="cascade"/>
         </join>
-        <key>
-           <column name="PARAM_KEY" length="256" jdbc-type="VARCHAR"/>
-        </key>
-        <value table="SERDE_PARAMS_TEXT">
-          <join>
-            <column name="PARAM_KEY"/>
-            <foreign-key name="SD_PARAM_TEXT_FK" delete-action="cascade"/>
-          </join>
-          <column name="PARAM_VALUE" length="13000" jdbc-type="VARCHAR"/>
-        </value>
       </field>
       <field name="description">
         <column name="DESCRIPTION" length="2000" jdbc-type="VARCHAR" allows-null="true"/>
@@ -376,12 +364,7 @@
             <field name="name">
               <column name="COLUMN_NAME" length="767" jdbc-type="VARCHAR"/>
               </field>
-            <field name="type" table="COLUMN_TYPE">
-              <collection element-type="java.lang.String"/>
-              <join>
-                <column name="CD_ID"/>
-                <foreign-key name="CD_TYPE_FK" delete-action="cascade"/>
-              </join>
+            <field name="type">
               <column name="TYPE_NAME" length="32672" jdbc-type="VARCHAR" allows-null="false"/>
             </field>
             <field name="comment">
@@ -405,6 +388,14 @@
        <element column="STRING_LIST_VALUE"/>
      </field>
    </class>
+
+    <class name="MSDSParam" identity-type="datastore" table="SDS_PARAMS_CHUNKS">
+      <datastore-identity/>
+      <field name="chunks">
+        <collection element-type="java.lang.String"/>
+        <column name="CHUNK" jdbc-type="VARCHAR" length="13000" />
+      </field>
+    </class>
 
     <class name="MStorageDescriptor" identity-type="datastore" table="SDS" detachable="true">
       <datastore-identity>
@@ -469,17 +460,11 @@
         </element>
       </field>
       <field name="parameters" table="SD_PARAMS">
-        <map key-type="java.lang.String" value-type="java.lang.String"/>
+        <map key-type="java.lang.String" value-type="org.apache.hadoop.hive.metastore.model.MSDSParam"/>
         <join>
           <column name="SD_ID"/>
           <foreign-key name="PARAMS_SD_FK" delete-action="cascade"/>
         </join>
-        <key>
-           <column name="PARAM_KEY" length="256" jdbc-type="VARCHAR"/>
-        </key>
-        <value>
-           <column name="PARAM_VALUE" length="32672" jdbc-type="VARCHAR"/>
-        </value>
       </field>
       <field name="skewedColNames" table="SKEWED_COL_NAMES">
         <collection element-type="java.lang.String"/>
@@ -490,7 +475,7 @@
         <element column="SKEWED_COL_NAME"/>
       </field>
       <field name="skewedColValues" table="SKEWED_VALUES">
-        <collection element-type="MStringList"/>
+        <collection element-type="longView"/>
         <join>
         <foreign-key name="SKVAL_SD_FK" delete-action="cascade"/>
         </join>
