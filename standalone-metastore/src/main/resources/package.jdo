@@ -475,7 +475,7 @@
         <element column="SKEWED_COL_NAME"/>
       </field>
       <field name="skewedColValues" table="SKEWED_VALUES">
-        <collection element-type="longView"/>
+        <collection element-type="MStringList"/>
         <join>
         <foreign-key name="SKVAL_SD_FK" delete-action="cascade"/>
         </join>
