@@ -84,7 +84,7 @@
 
 <property>
   <name>javax.jdo.option.ConnectionURL</name>
-  <value>jdbc:derby:memory:${test.tmp.dir}/junit_metastore_db;create=true</value>
+  <value>jdbc:derby:${test.tmp.dir}/junit_metastore_db;create=true</value>
 </property>
 
 <property>

@@ -135,10 +135,15 @@
       </field>
     </class>
 
-    <class name="MTableParam" table="TABLE_PARAMS_CHUNKS">
-      <datastore-identity/>
-      <field name="chunks">
+    <class name="MTableParam" identity-type="datastore" detachable="true" table="TABLE_PARAMS_CHUNKS_LIST">
+      <datastore-identity>
+          <column name="PARAM_CHUNKS_ID" />
+      </datastore-identity>
+      <field name="chunks" table="TABLE_PARAMS_CHUNKS">
         <collection element-type="java.lang.String"/>
+        <join>
+          <column name="PARAM_CHUNKS_ID" />
+        </join>
         <column name="CHUNK" jdbc-type="VARCHAR" length="13000" />
       </field>
     </class>
@@ -207,6 +212,9 @@
           <column name="TBL_ID"/>
           <foreign-key name="PARAM_TBL_FK" delete-action="cascade"/>
         </join>
+        <key>
+           <column name="PARAM_KEY" length="256" jdbc-type="VARCHAR"/>
+        </key>
       </field>
       <field name="viewOriginalText" table="VIEW_ORG_TEXT">
         <collection element-type="java.lang.String"/>
@@ -298,10 +306,15 @@
       </field>
     </class>
 
-    <class name="MSerdeParam" identity-type="datastore" table="SERDE_PARAMS_CHUNKS">
-      <datastore-identity/>
-      <field name="chunks">
+    <class name="MSerdeParam" identity-type="datastore" detachable="true" table="SERDE_PARAMS_CHUNKS_LIST">
+      <datastore-identity>
+        <column name="PARAM_CHUNKS_ID" />
+      </datastore-identity>
+      <field name="chunks" table="SERDE_PARAMS_CHUNKS">
         <collection element-type="java.lang.String"/>
+        <join>
+          <column name="PARAM_CHUNKS_ID" />
+        </join>
         <column name="CHUNK" jdbc-type="VARCHAR" length="13000" />
       </field>
     </class>
@@ -322,6 +335,9 @@
           <column name="SERDE_ID"/>
           <foreign-key name="SERDE_PARAMS_FK" delete-action="cascade"/>
         </join>
+        <key>
+           <column name="PARAM_KEY" length="256" jdbc-type="VARCHAR"/>
+        </key>
       </field>
       <field name="description">
         <column name="DESCRIPTION" length="2000" jdbc-type="VARCHAR" allows-null="true"/>
@@ -363,9 +379,10 @@
           <embedded>
             <field name="name">
               <column name="COLUMN_NAME" length="767" jdbc-type="VARCHAR"/>
-              </field>
-            <field name="type">
-              <column name="TYPE_NAME" length="32672" jdbc-type="VARCHAR" allows-null="false"/>
+            </field>
+            <field name="type" table="COLUMNS_TYPE_CHUNKS">
+              <collection element-type="java.lang.String" />
+              <column name="TYPE_NAME" length="13000" jdbc-type="VARCHAR" allows-null="false"/>
             </field>
             <field name="comment">
               <column name="COMMENT" length="256" jdbc-type="VARCHAR" allows-null="true"/>
@@ -389,10 +406,15 @@
      </field>
    </class>
 
-    <class name="MSDSParam" identity-type="datastore" table="SDS_PARAMS_CHUNKS">
-      <datastore-identity/>
-      <field name="chunks">
+    <class name="MSDSParam" identity-type="datastore" detachable="true" table="SDS_PARAMS_CHUNKS_LIST">
+      <datastore-identity>
+        <column name="PARAM_CHUNKS_ID" />
+      </datastore-identity>
+      <field name="chunks" table="SDS_PARAMS_CHUNKS">
         <collection element-type="java.lang.String"/>
+        <join>
+          <column name="PARAM_CHUNKS_ID" />
+        </join>
         <column name="CHUNK" jdbc-type="VARCHAR" length="13000" />
       </field>
     </class>
@@ -465,6 +487,9 @@
           <column name="SD_ID"/>
           <foreign-key name="PARAMS_SD_FK" delete-action="cascade"/>
         </join>
+        <key>
+           <column name="PARAM_KEY" length="256" jdbc-type="VARCHAR"/>
+        </key>
       </field>
       <field name="skewedColNames" table="SKEWED_COL_NAMES">
         <collection element-type="java.lang.String"/>
