@@ -88,6 +88,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>io.hops</groupId>
+      <artifactId>hopsfs-client-api</artifactId>
+      <version>3.2.0.8-EE-RC0</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.orc</groupId>
       <artifactId>orc-core</artifactId>
       <version>${orc.version}</version>
