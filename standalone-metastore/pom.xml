@@ -90,7 +90,7 @@
     <dependency>
       <groupId>io.hops</groupId>
       <artifactId>hopsfs-client-api</artifactId>
-      <version>3.2.0.8-EE-RC0</version>
+      <version>3.2.0.9-EE-RC0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.orc</groupId>
@@ -864,6 +864,17 @@
       </releases>
       <snapshots>
         <enabled>false</enabled>
+      </snapshots>
+    </repository>
+        <repository>
+      <id>HopsEE</id>
+      <name>Hops Enterprise Repository</name>
+      <url>https://nexus.hops.works/repository/hops-artifacts</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
       </snapshots>
     </repository>
   </repositories>
